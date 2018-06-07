@@ -37,12 +37,13 @@ passport.use(new Auth0Strategy({
 }, 
 (accessToken, refreshToken, extraParams, profile, done) => {
     const db = app.get('db');
-    let {id, displayName, picture} = profile;
-    db.find_user([id]).then(user => {
+    let {displayName, picture} = profile;
+    let authID = profile.id
+    db.find_user([authID]).then(user => {
         if(user[0]){
             done(null, user[0].id);
         } else {
-            db.create_user([displayName, picture, id]).then((createdUser) => {
+            db.create_user([displayName, picture, authID]).then((createdUser) => {
                 done(null, createdUser[0].id);
             })
         }
@@ -52,13 +53,27 @@ passport.serializeUser((id, done) => {
     done(null, id);
 })
 passport.deserializeUser((id, done) => {
-    done(null, id);
+    const db = app.get('db');
+    db.find_session_user([id]).then(user => {
+        done(null, user[0]);
+    })
 })
 
 app.get('/auth', passport.authenticate('auth0'));
 app.get('/auth/callback', passport.authenticate('auth0', {
-    successRedirect: 'http://localhost:3000',
+    successRedirect: 'http://localhost:3000/#/private',
 }))
+app.get('/auth/user', (req, res) => {
+    if(req.user){
+        res.status(200).send(req.user);
+    } else {
+        res.status(401).send('Unauthorized');
+    }
+})
+app.get('/auth/logout', (req, res) => {
+    req.logout();
+    res.redirect('http://localhost:3000')
+})
 
 
 
