@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express')
     , session = require('express-session')
     , passport = require('passport')
-    , Auth0Strategy = require('passport-auth0');
+    , Auth0Strategy = require('passport-auth0')
+    , massive = require('massive');
 
 const {
     SERVER_PORT,
@@ -10,10 +11,15 @@ const {
     DOMAIN,
     CLIENT_ID,
     CLIENT_SECRET,
-    CALLBACK_URL
+    CALLBACK_URL,
+    CONNECTION_STRING
 } = process.env;
 
 const app = express();
+
+massive(CONNECTION_STRING).then(db => {
+    app.set('db', db);
+})
 
 app.use(session({
     secret: SESSION_SECRET,
@@ -28,14 +34,25 @@ passport.use(new Auth0Strategy({
     clientSecret: CLIENT_SECRET,
     callbackURL: CALLBACK_URL,
     scope: 'openid profile'
-}, (accessToken, refreshToken, extraParams, profile, done) => {
-    done(null, profile);
+}, 
+(accessToken, refreshToken, extraParams, profile, done) => {
+    const db = app.get('db');
+    let {id, displayName, picture} = profile;
+    db.find_user([id]).then(user => {
+        if(user[0]){
+            done(null, user[0].id);
+        } else {
+            db.create_user([displayName, picture, id]).then((createdUser) => {
+                done(null, createdUser[0].id);
+            })
+        }
+    })
 }));
-passport.serializeUser((profile, done) => {
-    done(null, profile);
+passport.serializeUser((id, done) => {
+    done(null, id);
 })
-passport.deserializeUser((profile, done) => {
-    done(null, profile);
+passport.deserializeUser((id, done) => {
+    done(null, id);
 })
 
 app.get('/auth', passport.authenticate('auth0'));
