@@ -16,6 +16,7 @@ const {
 } = process.env;
 
 const app = express();
+app.use(express.static(__dirname + './../build'))
 
 massive(CONNECTION_STRING).then(db => {
     app.set('db', db);
@@ -33,13 +34,13 @@ passport.use(new Auth0Strategy({
     clientID: CLIENT_ID,
     clientSecret: CLIENT_SECRET,
     callbackURL: CALLBACK_URL,
-    scope: 'openid profile'
+    scope: 'openid email profile'
 }, 
 (accessToken, refreshToken, extraParams, profile, done) => {
     const db = app.get('db');
     let {displayName, picture} = profile;
     let authID = profile.id
-    db.find_user([authID]).then(user => {
+        db.find_user([authID]).then(user => {
         if(user[0]){
             done(null, user[0].id);
         } else {
@@ -61,7 +62,7 @@ passport.deserializeUser((id, done) => {
 
 app.get('/auth', passport.authenticate('auth0'));
 app.get('/auth/callback', passport.authenticate('auth0', {
-    successRedirect: 'http://localhost:3000/#/private',
+    successRedirect: 'http://localhost:3333/#/private',
 }))
 app.get('/auth/user', (req, res) => {
     if(req.user){
@@ -72,7 +73,7 @@ app.get('/auth/user', (req, res) => {
 })
 app.get('/auth/logout', (req, res) => {
     req.logout();
-    res.redirect('http://localhost:3000')
+    res.redirect('http://localhost:3333')
 })
 
 
